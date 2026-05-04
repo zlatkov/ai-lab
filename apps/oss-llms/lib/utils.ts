@@ -1,10 +1,4 @@
-const CLOSED_SOURCE_PREFIXES = ['anthropic/', 'openai/', 'x-ai/'];
-const CLOSED_GOOGLE_PATTERNS = ['gemini-pro', 'gemini-flash', 'gemini-ultra', 'gemini-1.', 'gemini-2.', 'gemini-exp'];
-
-export function isOssModel(modelId: string): boolean {
-  const lower = modelId.toLowerCase();
-  if (CLOSED_SOURCE_PREFIXES.some(p => lower.startsWith(p))) return false;
-  if (lower.startsWith('google/') && CLOSED_GOOGLE_PATTERNS.some(p => lower.includes(p))) return false;
+export function isOssModel(_modelId: string): boolean {
   return true;
 }
 
