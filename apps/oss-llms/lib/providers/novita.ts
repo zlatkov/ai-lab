@@ -4,11 +4,9 @@ import { inferFamily, inferParams, isOssModel } from '../utils';
 interface NovitaModel {
   id: string;
   object?: string;
-  context_length?: number;
-  pricing?: {
-    prompt?: number;      // USD per token
-    completion?: number;  // USD per token
-  };
+  context_size?: number;
+  input_token_price_per_m?: number;
+  output_token_price_per_m?: number;
 }
 
 export async function fetchNovita(): Promise<ModelEntry[]> {
@@ -33,10 +31,10 @@ export async function fetchNovita(): Promise<ModelEntry[]> {
         params: inferParams(m.id),
         providerId: 'novita',
         providerModelId: m.id,
-        inputPrice: m.pricing?.prompt != null ? m.pricing.prompt * 1_000_000 : null,
-        outputPrice: m.pricing?.completion != null ? m.pricing.completion * 1_000_000 : null,
+        inputPrice: m.input_token_price_per_m != null ? m.input_token_price_per_m / 10_000 : null,
+        outputPrice: m.output_token_price_per_m != null ? m.output_token_price_per_m / 10_000 : null,
         freeTier: false,
-        contextLength: m.context_length ?? null,
+        contextLength: m.context_size ?? null,
         rpm: null,
         tpm: null,
         rpd: null,
