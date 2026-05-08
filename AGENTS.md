@@ -2,14 +2,15 @@
 
 ## Monorepo Overview
 
-This is a Turborepo monorepo with four Next.js apps:
+This is a Turborepo monorepo with five Next.js apps:
 
 ```
 apps/
 ├── home/       Personal home page (zlatkov.ai)
 ├── skillab/    Skill evaluator + dependency graph (skillab.zlatkov.ai)
 ├── ai-news/    AI news digest agent (ainews.zlatkov.ai)
-└── oss-llms/   OSS LLM pricing tracker (llms.zlatkov.ai)
+├── oss-llms/   OSS LLM pricing tracker (llms.zlatkov.ai)
+└── tycoon/     AI economy tycoon game (tycoon.zlatkov.ai)
 ```
 
 Each app has its own `package.json`, `next.config.ts`, `tsconfig.json`, and `vercel.json` where applicable. They share no code packages — each `lib/` is app-local.
@@ -181,3 +182,75 @@ apps/oss-llms/
 | `CRON_SECRET` | Yes | Protects the cron endpoint |
 | `OPENROUTER_API_KEY` | No | Used by OpenRouter provider fetcher |
 | `NEXT_PUBLIC_HOME_URL` | Dev only | Falls back to `https://zlatkov.ai` |
+
+---
+
+## apps/tycoon
+
+Browser-based city-builder tycoon game where the player builds an AI industry. HTML5 Canvas game engine running inside a Next.js shell. All game logic is client-side; the only server route is the AI advisor chat proxy.
+
+```
+apps/tycoon/
+├── app/
+│   ├── page.tsx              # React UI shell — resource bar, build panel, info panel, AI chat
+│   ├── layout.tsx
+│   ├── globals.css
+│   └── api/
+│       └── chat/route.ts     # OpenRouter proxy for AI advisor (supports BYOK)
+└── lib/
+    ├── types.ts              # GameState, PlacedBuilding, Resources, BuildingType, etc.
+    ├── constants.ts          # BUILDING_DEFS, PLAYER_BUILDING_ORDER, MAX_RESOURCES, costs
+    ├── game.ts               # Game class, createInitialState, city generation, place/demolish
+    ├── economy.ts            # tick() — per-building production/consumption, railway bonus
+    ├── renderer.ts           # Canvas renderer — terrain, infra auto-tiling, buildings, power wires
+    ├── vehicles.ts           # VehicleSystem — trip-based cars, loop buses/trains, bus stops
+    ├── input.ts              # InputHandler — mouse/touch/keyboard, drag-to-pan, drag-to-paint
+    ├── save.ts               # localStorage save/load (3 slots + auto-save)
+    └── ai-commands.ts        # parseCommands, executeCommands, summarizeGameState
+```
+
+### Game Architecture
+
+- **Imperative game loop**: `Game` class owns `GameState` and runs a `requestAnimationFrame` loop. React gets UI snapshots via `onUIUpdate` callback (no React state in the hot path).
+- **Camera**: world-space tile coordinates; screen = `(world - camera) * TILE_SIZE * zoom + canvas/2`.
+- **Tick accumulator**: `tickAcc += dt * speed`; one economy tick fires per 1000ms of accumulated time. Speed multipliers: 0 (pause), 1×, 2×, 5×.
+- **Economy**: buildings sorted by id, each checks resource availability, produces/consumes. Resources clamped to `MAX_RESOURCES` caps each tick.
+
+### Buildings
+
+14 building types split into player-buildable and city (builtin, indestructible):
+
+**Player**: HQ, Power Plant, Office, Station, Data Center, Research Lab, GPU Farm, Server Farm, AI Lab  
+**City** (pre-generated): city_house, town_hall, city_market, city_station, city_park
+
+Resource chain: Power Plant → energy → Data Center/GPU Farm → compute → Research Lab/AI Lab → data/research → Server Farm/AI Lab → capital.
+
+### Infrastructure
+
+Three infra types painted by drag: `road` ($10/tile), `railway` ($30/tile), `power_line` ($5/tile).  
+Auto-tiling uses a 4-bit neighbor mask (N/E/S/W) to draw correct turns.  
+Adjacent infra gives buildings +10% efficiency. Power line adjacency is shown as a pulsing amber wire.
+
+### Railway Connectivity
+
+A player Station connected to the city station via continuous railway gets `+STATION_TALENT_BONUS` talent/tick. Checked via BFS each tick.
+
+### Vehicles
+
+- **Cars**: trip-based. Spawn at road-adjacent building, BFS-route to another building, despawn on arrival. Up to 28 simultaneous.
+- **Buses**: loop along roads, pause at hardcoded bus stops.
+- **Trains**: loop along railway tiles. 4-car consist: locomotive (tapered nose, cab, dome, smokestack) + 3 passenger cars (windows, couplings). Rendered via `ctx.rotate()`.
+
+### AI Advisor
+
+`/api/chat` proxies to OpenRouter. Accepts `userApiKey` (BYOK) and `model` override in the request body. Falls back to `OPENROUTER_API_KEY` env var. The system prompt embeds all building definitions and grid coordinates. Responses can contain a `<commands>[...]</commands>` JSON block that `executeCommands()` applies to the live game state.
+
+Costs 20 Research Points per query, capped at 5 queries/day.
+
+### Environment Variables
+
+| Variable | Required | Notes |
+|---|---|---|
+| `OPENROUTER_API_KEY` | Recommended | Server-side key; users can BYOK via UI |
+| `TYCOON_MODEL` | No | Override default model (`meta-llama/llama-3.1-8b-instruct`) |
+| `NEXT_PUBLIC_HOME_URL` | No | ← Home link target (falls back to `https://zlatkov.ai`) |
