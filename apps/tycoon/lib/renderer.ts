@@ -1,6 +1,7 @@
 import { TILE_SIZE, GRID_W, GRID_H, BUILDING_DEFS, CITY_WIDTH } from './constants';
 import type { Game, BuildMode } from './game';
 import type { PlacedBuilding, Tile, InfraType, BuildingType } from './types';
+import { VehicleSystem } from './vehicles';
 
 // ── Infra neighbor mask ─────────────────────────────────────────────────────
 // bit 0=N, 1=E, 2=S, 3=W
@@ -472,8 +473,12 @@ function drawPeople(
 export class Renderer {
   private game: Game;
   private time = 0;
+  vehicles: VehicleSystem;
 
-  constructor(game: Game) { this.game = game; }
+  constructor(game: Game) {
+    this.game = game;
+    this.vehicles = new VehicleSystem(game);
+  }
 
   render() {
     const { canvas, ctx, camera, state } = this.game;
@@ -562,6 +567,11 @@ export class Renderer {
       }
     }
 
+    // Vehicles (cars, buses, trains) + bus stops
+    this.vehicles.checkRefresh();
+    this.vehicles.update(this.time * 1000);
+    this.vehicles.draw(ctx, camera.x, camera.y, camera.zoom, canvas.width, canvas.height);
+
     // Selection ring (only when something is selected)
     if (this.game.selected) {
       const b = this.game.selected;
@@ -615,12 +625,39 @@ export class Renderer {
       ctx.fillText('💤', sx + w - 2, sy + 2);
     }
 
+    // Power connection badge
+    if (ts > 32 && this.hasAdjacentInfra(b, 'power_line')) {
+      const bSz = Math.max(8, ts * 0.18);
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.arc(sx + bSz * 0.7, sy + h - bSz * 0.7, bSz * 0.65, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = `${Math.max(8, ts * 0.16)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⚡', sx + bSz * 0.7, sy + h - bSz * 0.7);
+    }
+
     // Animated people for operational buildings
     if (b.operational && ts > 28) {
       const count = Math.min(4, def.size * 2);
       const seed = (b.x * 13 + b.y * 7) % (Math.PI * 2);
       drawPeople(ctx, sx + w * 0.1, sy + h * 0.55, w * 0.8, h * 0.35, count, seed, this.time, ts);
     }
+  }
+
+  private hasAdjacentInfra(b: PlacedBuilding, infra: InfraType): boolean {
+    const def = BUILDING_DEFS[b.type];
+    const grid = this.game.state.grid;
+    for (let dy = -1; dy <= def.size; dy++) {
+      for (let dx = -1; dx <= def.size; dx++) {
+        if (dx >= 0 && dx < def.size && dy >= 0 && dy < def.size) continue;
+        const tx = b.x + dx, ty = b.y + dy;
+        if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) continue;
+        if (grid[ty][tx].infra === infra) return true;
+      }
+    }
+    return false;
   }
 
   private drawShape(type: BuildingType, sx: number, sy: number, w: number, h: number, ts: number, _operational: boolean) {

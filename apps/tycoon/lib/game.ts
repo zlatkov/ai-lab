@@ -21,10 +21,6 @@ function makeGrid(): Tile[][] {
   return g;
 }
 
-function seededRand(x: number, y: number): number {
-  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return n - Math.floor(n);
-}
 
 function placeBuiltin(state: GameState, type: BuildingType, x: number, y: number): boolean {
   const def = BUILDING_DEFS[type];
@@ -83,7 +79,7 @@ function generateCity(state: GameState): void {
       if (grid[y][x].buildingId || grid[y][x].infra) continue;
       // Only place on even coords so they don't overlap
       if (x % 2 !== 0 || y % 2 !== 0) continue;
-      if (seededRand(x, y) > 0.35) {
+      if (Math.random() > 0.38) {
         placeBuiltin(state, 'city_house', x, y);
       }
     }
@@ -351,6 +347,7 @@ export class Game {
     this.state = s;
     this.selected = null;
     this.buildMode = null;
+    this.renderer.vehicles.refresh();
     this.emitUI();
     this.onSelect(null);
     this.onModeChange(null);
@@ -362,6 +359,7 @@ export class Game {
     this.camera = { x: 22, y: 32, zoom: 0.9 };
     this.selected = null;
     this.buildMode = null;
+    this.renderer.vehicles.refresh();
     this.emitUI();
     this.onSelect(null);
     this.onModeChange(null);
