@@ -239,6 +239,7 @@ export default function Page() {
         <button className={`btn ${ui.speed === 2 ? 'active' : ''}`} title="2× (2)" onClick={() => setSpeed(2)}>2×</button>
         <button className={`btn ${ui.speed === 5 ? 'active' : ''}`} title="5× (3)" onClick={() => setSpeed(5)}>5×</button>
         <button className="btn" onClick={() => { refreshSaves(); setShowSaveMenu(v => !v); }}>💾</button>
+        <button className="btn" title="Reset game" style={{ color: '#fca5a5' }} onClick={onResetClick}>↺ Reset</button>
         <button className="btn" onClick={() => setShowHelp(v => !v)}>?</button>
       </div>
 
