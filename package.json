@@ -9,7 +9,8 @@
     "dev:home": "turbo dev --filter=home",
     "dev:skillab": "turbo dev --filter=skillab",
     "dev:ainews": "turbo dev --filter=ai-news",
-    "dev:ossllms": "turbo dev --filter=oss-llms"
+    "dev:ossllms": "turbo dev --filter=oss-llms",
+    "dev:tycoon": "turbo dev --filter=tycoon"
   },
   "devDependencies": {
     "turbo": "^2.0.0"
