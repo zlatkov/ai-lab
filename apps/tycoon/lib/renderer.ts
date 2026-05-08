@@ -567,6 +567,9 @@ export class Renderer {
       }
     }
 
+    // Power line connections (drawn over buildings, under vehicles)
+    if (ts > 20) this.drawPowerConnections(ts);
+
     // Vehicles (cars, buses, trains) + bus stops
     this.vehicles.checkRefresh();
     this.vehicles.update(this.time * 1000);
@@ -638,11 +641,56 @@ export class Renderer {
       ctx.fillText('⚡', sx + bSz * 0.7, sy + h - bSz * 0.7);
     }
 
-    // Animated people for operational buildings
-    if (b.operational && ts > 28) {
-      const count = Math.min(4, def.size * 2);
-      const seed = (b.x * 13 + b.y * 7) % (Math.PI * 2);
-      drawPeople(ctx, sx + w * 0.1, sy + h * 0.55, w * 0.8, h * 0.35, count, seed, this.time, ts);
+  }
+
+  private drawPowerConnections(ts: number) {
+    const { ctx, camera, canvas, state } = this.game;
+    const pulse = 0.55 + Math.sin(this.time * 2.5) * 0.45; // 0..1 pulsing
+    const alpha = 0.5 + pulse * 0.4;
+
+    for (const b of Object.values(state.buildings)) {
+      const def = BUILDING_DEFS[b.type];
+      // Find adjacent power_line tiles
+      for (let dy = -1; dy <= def.size; dy++) {
+        for (let dx = -1; dx <= def.size; dx++) {
+          if (dx >= 0 && dx < def.size && dy >= 0 && dy < def.size) continue;
+          const tx = b.x + dx, ty = b.y + dy;
+          if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) continue;
+          if (state.grid[ty][tx].infra !== 'power_line') continue;
+
+          // Wire from power tile center to building edge
+          const pwx = (tx + 0.5 - camera.x) * ts + canvas.width / 2;
+          const pwy = (ty + 0.5 - camera.y) * ts + canvas.height / 2;
+          // Clamp endpoint to building edge
+          const bsx = (b.x - camera.x) * ts + canvas.width / 2;
+          const bsy = (b.y - camera.y) * ts + canvas.height / 2;
+          const bex = bsx + def.size * ts, bey = bsy + def.size * ts;
+          const ecx = Math.max(bsx, Math.min(bex, pwx));
+          const ecy = Math.max(bsy, Math.min(bey, pwy));
+
+          // Glow wire
+          ctx.save();
+          ctx.strokeStyle = `rgba(251,191,36,${alpha})`;
+          ctx.lineWidth = Math.max(1.5, ts * 0.04);
+          ctx.shadowColor = '#fbbf24';
+          ctx.shadowBlur = ts * 0.15;
+          ctx.beginPath();
+          ctx.moveTo(pwx, pwy);
+          ctx.lineTo(ecx, ecy);
+          ctx.stroke();
+          ctx.restore();
+
+          // Spark dot at connection point
+          ctx.save();
+          ctx.fillStyle = `rgba(254,240,138,${alpha})`;
+          ctx.shadowColor = '#fef08a';
+          ctx.shadowBlur = ts * 0.2;
+          ctx.beginPath();
+          ctx.arc(ecx, ecy, Math.max(2, ts * 0.06), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
     }
   }
 
