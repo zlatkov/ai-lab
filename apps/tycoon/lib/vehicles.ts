@@ -406,29 +406,148 @@ function drawBus(ctx: CanvasRenderingContext2D, sx: number, sy: number, ts: numb
   ctx.restore();
 }
 
-function drawTrainCar(ctx: CanvasRenderingContext2D, sx: number, sy: number, ts: number, dx: number, dy: number, color: string, isHead: boolean) {
+function drawTrainCar(ctx: CanvasRenderingContext2D, sx: number, sy: number, ts: number, dx: number, dy: number, _color: string, isHead: boolean) {
   if (ts < 8) return;
-  const isNS = dy !== 0 || dx === 0;
-  const bw = ts * 0.44, bh = ts * 0.28;
-  const cw = isNS ? bh : bw, ch = isNS ? bw : bh;
   ctx.save();
   ctx.translate(sx, sy);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(-cw / 2, -ch / 2, cw, ch, ts * 0.04);
-  else ctx.rect(-cw / 2, -ch / 2, cw, ch);
-  ctx.fill();
-  if (ts >= 16) {
-    ctx.fillStyle = 'rgba(200,240,255,0.45)';
-    if (isNS) ctx.fillRect(-cw * 0.32, -ch * 0.2, cw * 0.64, ch * 0.4);
-    else ctx.fillRect(-cw * 0.2, -ch * 0.32, cw * 0.4, ch * 0.64);
-  }
-  if (isHead && ts >= 14) {
+  // Rotate so +x = direction of travel
+  if (dx !== 0 || dy !== 0) ctx.rotate(Math.atan2(dy, dx));
+
+  const len = ts * 0.82;  // along direction of travel
+  const wid = ts * 0.28;  // perpendicular
+  const hw = wid / 2;
+  const hl = len / 2;
+
+  if (isHead) {
+    // ── Locomotive ────────────────────────────────────────────
+    // Under-frame / running board
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(-hl, -hw - ts * 0.04, len, wid + ts * 0.08);
+
+    // Main boiler body (front 60%)
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(-hl + len * 0.02, -hw, len * 0.6, wid, ts * 0.03);
+    else ctx.rect(-hl + len * 0.02, -hw, len * 0.6, wid);
+    ctx.fill();
+
+    // Tapered nose (cowcatcher direction)
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.moveTo(hl - len * 0.35, -hw);
+    ctx.lineTo(hl, -hw * 0.4);
+    ctx.lineTo(hl, hw * 0.4);
+    ctx.lineTo(hl - len * 0.35, hw);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cab (rear box)
+    ctx.fillStyle = '#334155';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(-hl, -hw - ts * 0.1, len * 0.38, wid + ts * 0.1, ts * 0.02);
+    else ctx.rect(-hl, -hw - ts * 0.1, len * 0.38, wid + ts * 0.1);
+    ctx.fill();
+
+    // Cab roof
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(-hl + len * 0.01, -hw - ts * 0.14, len * 0.36, ts * 0.06);
+
+    if (ts >= 18) {
+      // Cab windows
+      ctx.fillStyle = 'rgba(186,230,253,0.8)';
+      ctx.fillRect(-hl + len * 0.04, -hw - ts * 0.08, len * 0.12, ts * 0.06);
+      ctx.fillRect(-hl + len * 0.18, -hw - ts * 0.08, len * 0.12, ts * 0.06);
+
+      // Boiler dome
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.ellipse(-hl + len * 0.55, -hw - ts * 0.04, len * 0.07, ts * 0.06, 0, Math.PI, 0, true);
+      ctx.fill();
+
+      // Smokestack
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(-hl + len * 0.42, -hw - ts * 0.14, len * 0.07, ts * 0.12);
+      ctx.fillRect(-hl + len * 0.4, -hw - ts * 0.15, len * 0.11, ts * 0.03);
+
+      // Red accent stripe
+      ctx.fillStyle = '#dc2626';
+      ctx.fillRect(-hl + len * 0.02, -hw * 0.12, len * 0.6, hw * 0.24);
+    }
+
+    // Headlight glow
     ctx.fillStyle = '#fef08a';
-    if (dx > 0) ctx.fillRect(cw / 2 - ts * 0.05, -ch * 0.2, ts * 0.04, ch * 0.4);
-    else if (dx < 0) ctx.fillRect(-cw / 2, -ch * 0.2, ts * 0.04, ch * 0.4);
-    else if (dy > 0) ctx.fillRect(-cw * 0.2, ch / 2 - ts * 0.05, cw * 0.4, ts * 0.04);
-    else ctx.fillRect(-cw * 0.2, -ch / 2, cw * 0.4, ts * 0.04);
+    ctx.shadowColor = '#fef08a';
+    ctx.shadowBlur = ts * 0.12;
+    ctx.beginPath();
+    ctx.arc(hl - ts * 0.03, 0, ts * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Wheels (4 pairs)
+    if (ts >= 18) {
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = Math.max(1, ts * 0.015);
+      const wr = ts * 0.07;
+      for (const wx of [-hl + len * 0.18, -hl + len * 0.38, hl - len * 0.28, hl - len * 0.12]) {
+        for (const wy of [-hw - wr * 0.5, hw + wr * 0.5]) {
+          ctx.beginPath(); ctx.arc(wx, wy, wr, 0, Math.PI * 2);
+          ctx.fill(); ctx.stroke();
+          // Spoke
+          ctx.beginPath(); ctx.moveTo(wx - wr * 0.6, wy); ctx.lineTo(wx + wr * 0.6, wy); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(wx, wy - wr * 0.6); ctx.lineTo(wx, wy + wr * 0.6); ctx.stroke();
+        }
+      }
+    }
+
+  } else {
+    // ── Passenger car ────────────────────────────────────────
+    // Under-frame
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(-hl, -hw - ts * 0.03, len, wid + ts * 0.06);
+
+    // Main body
+    ctx.fillStyle = '#cbd5e1';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(-hl + len * 0.02, -hw, len * 0.96, wid, ts * 0.025);
+    else ctx.rect(-hl + len * 0.02, -hw, len * 0.96, wid);
+    ctx.fill();
+
+    // Blue stripe
+    ctx.fillStyle = '#1d4ed8';
+    ctx.fillRect(-hl + len * 0.02, -hw * 0.18, len * 0.96, hw * 0.36);
+
+    if (ts >= 16) {
+      // Windows
+      const nw = Math.max(3, Math.floor(len / (ts * 0.22)));
+      const gap = len * 0.85 / nw;
+      const ww = gap * 0.55, wh = wid * 0.38;
+      for (let i = 0; i < nw; i++) {
+        const wx = -hl + len * 0.075 + i * gap;
+        ctx.fillStyle = 'rgba(186,230,253,0.85)';
+        ctx.fillRect(wx, -wh / 2, ww, wh);
+      }
+    }
+
+    // Coupling connectors
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(-hl - ts * 0.04, -hw * 0.2, ts * 0.04, hw * 0.4);
+    ctx.fillRect(hl, -hw * 0.2, ts * 0.04, hw * 0.4);
+
+    // Wheels
+    if (ts >= 18) {
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = Math.max(1, ts * 0.015);
+      const wr = ts * 0.065;
+      for (const wx of [-hl + len * 0.2, -hl + len * 0.38, hl - len * 0.38, hl - len * 0.2]) {
+        for (const wy of [-hw - wr * 0.5, hw + wr * 0.5]) {
+          ctx.beginPath(); ctx.arc(wx, wy, wr, 0, Math.PI * 2);
+          ctx.fill(); ctx.stroke();
+        }
+      }
+    }
   }
+
   ctx.restore();
 }
