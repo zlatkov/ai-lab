@@ -7,6 +7,7 @@ export class InputHandler {
   private keys = new Set<string>();
   private isDragging = false;
   private dragStart: { sx: number; sy: number; cx: number; cy: number } | null = null;
+  private cameraAtDown: { x: number; y: number } | null = null;
   private isPainting = false;
   private lastPaintTile: { x: number; y: number } | null = null;
   private rafPan: number | null = null;
@@ -58,6 +59,9 @@ export class InputHandler {
     const [sx, sy] = this.localXY(e);
     this.pointerDownAt = { sx, sy, t: performance.now() };
 
+    // Record camera position at mousedown for lazy drag detection
+    this.cameraAtDown = { x: this.game.camera.x, y: this.game.camera.y };
+
     if (e.button === 1 || (e.button === 0 && (e.shiftKey || e.altKey))) {
       this.isDragging = true;
       this.dragStart = { sx, sy, cx: this.game.camera.x, cy: this.game.camera.y };
@@ -92,6 +96,16 @@ export class InputHandler {
 
   private onMouseMove = (e: MouseEvent) => {
     const [sx, sy] = this.localXY(e);
+
+    // Activate pan from a plain left-drag when no build mode is active
+    if (!this.isDragging && !this.isPainting && this.pointerDownAt && this.cameraAtDown && !this.game.buildMode) {
+      const dist = Math.hypot(sx - this.pointerDownAt.sx, sy - this.pointerDownAt.sy);
+      if (dist > 5) {
+        this.isDragging = true;
+        this.dragStart = { sx: this.pointerDownAt.sx, sy: this.pointerDownAt.sy, cx: this.cameraAtDown.x, cy: this.cameraAtDown.y };
+        this.game.canvas.style.cursor = 'grabbing';
+      }
+    }
 
     if (this.isDragging && this.dragStart) {
       const ts = TILE_SIZE * this.game.camera.zoom;
@@ -130,6 +144,7 @@ export class InputHandler {
     this.dragStart = null;
     this.lastPaintTile = null;
     this.pointerDownAt = null;
+    this.cameraAtDown = null;
     this.game.canvas.style.cursor = this.game.buildMode ? 'crosshair' : 'default';
   };
 

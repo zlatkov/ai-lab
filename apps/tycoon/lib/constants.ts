@@ -122,9 +122,9 @@ export const PLAYER_BUILDING_ORDER: BuildingType[] = [
 ];
 
 export const INFRA_COST: Record<string, number> = {
-  road: 50,
-  railway: 150,
-  power_line: 30,
+  road: 10,
+  railway: 30,
+  power_line: 5,
 };
 
 export const INFRA_LABEL: Record<string, string> = {
