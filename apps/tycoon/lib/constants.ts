@@ -117,8 +117,9 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
 
 // What appears in the player build panel (in order)
 export const PLAYER_BUILDING_ORDER: BuildingType[] = [
-  'power_plant', 'office', 'data_center', 'research_lab',
-  'gpu_farm', 'server_farm', 'ai_lab', 'station',
+  'power_plant', 'office', 'station',
+  'data_center', 'research_lab',
+  'gpu_farm', 'server_farm', 'ai_lab',
 ];
 
 export const INFRA_COST: Record<string, number> = {
