@@ -2,13 +2,14 @@
 
 ## Monorepo Overview
 
-This is a Turborepo monorepo with three Next.js apps:
+This is a Turborepo monorepo with four Next.js apps:
 
 ```
 apps/
 ├── home/       Personal home page (zlatkov.ai)
 ├── skillab/    Skill evaluator + dependency graph (skillab.zlatkov.ai)
-└── ai-news/    AI news digest agent (ainews.zlatkov.ai)
+├── ai-news/    AI news digest agent (ainews.zlatkov.ai)
+└── oss-llms/   OSS LLM pricing tracker (llms.zlatkov.ai)
 ```
 
 Each app has its own `package.json`, `next.config.ts`, `tsconfig.json`, and `vercel.json` where applicable. They share no code packages — each `lib/` is app-local.
@@ -17,7 +18,7 @@ Each app has its own `package.json`, `next.config.ts`, `tsconfig.json`, and `ver
 
 ## apps/home
 
-Static home page. No API routes, no environment variables at runtime. Links to other apps via `NEXT_PUBLIC_SKILLAB_URL` and `NEXT_PUBLIC_AINEWS_URL` (fall back to production URLs).
+Static home page. No API routes, no environment variables at runtime. Links to other apps via `NEXT_PUBLIC_SKILLAB_URL`, `NEXT_PUBLIC_AINEWS_URL`, and `NEXT_PUBLIC_OSSLLMS_URL` (fall back to production URLs).
 
 ---
 
@@ -74,6 +75,7 @@ apps/skillab/
 
 ## apps/ai-news
 
+
 Automated AI industry news digest. An agent runs on a cron schedule, fetches news from multiple sources, and stores scored/categorized results in Supabase.
 
 ```
@@ -93,9 +95,13 @@ apps/ai-news/
 
 ### How the Agent Works
 
-1. **Parallel fetch** — HN Algolia API + 10 Brave Search queries fire simultaneously
-2. **Single LLM call** — All raw results sent to OpenRouter (default: `google/gemini-2.5-flash`) with a scoring prompt
-3. **Structured output** — LLM returns a JSON array of `NewsItem[]` with score ≥ 6
+1. **Parallel fetch** — All sources fire simultaneously:
+   - HN Algolia API (50 stories, filtered ≥ 10 points)
+   - 10 Brave Search queries (AI-industry keywords, `freshness=pw`)
+   - 7 RSS feeds: The Verge, TechCrunch, VentureBeat, a16z, Hugging Face, The Batch, MIT Tech Review
+   - X/Twitter API: recent posts from 8 key AI accounts (sama, karpathy, gdb, DarioAmodei, hwchase17, jerryjliu0, rauchg, ilyasut) — skipped if `X_BEARER_TOKEN` is absent
+2. **Single LLM call** — All raw results sent to OpenRouter (default: `openrouter/auto`) with a scoring prompt
+3. **Structured output** — LLM deduplicates, categorizes, and returns `NewsItem[]` with score ≥ 6
 4. **Store** — Results written to Supabase `news_runs` table
 
 This avoids multi-step agent overhead — parallel fetches + one LLM call is fast and deterministic.
@@ -136,4 +142,42 @@ Items are scored 1-10; only score ≥ 6 are stored. Categories are sorted by ite
 | `OPENROUTER_MODEL` | No | Override model (default: `openrouter/auto`) |
 | `LANGFUSE_PUBLIC_KEY` | No | Fetch system prompt from Langfuse (falls back to hardcoded) |
 | `LANGFUSE_SECRET_KEY` | No | Langfuse secret key |
+| `X_BEARER_TOKEN` | No | X/Twitter API bearer token (source skipped if absent) |
+| `NEXT_PUBLIC_HOME_URL` | Dev only | Falls back to `https://zlatkov.ai` |
+
+---
+
+## apps/oss-llms
+
+Tracks pricing and availability of open-source LLMs across inference providers. A cron job snapshots data daily; the page shows a deduplicated, grouped model list with per-provider pricing.
+
+```
+apps/oss-llms/
+├── app/
+│   ├── page.tsx              # Displays model groups with provider pricing
+│   ├── layout.tsx
+│   ├── globals.css
+│   └── api/
+│       └── cron/route.ts     # Fetches all providers, stores snapshot in Supabase
+└── lib/
+    ├── types.ts              # ModelEntry, ModelSnapshot, CronRun, provider IDs
+    ├── fetcher.ts            # Orchestrates 9 parallel provider fetches + dedup merge
+    ├── utils.ts              # Model grouping and name-cleaning helpers
+    └── providers/            # One file per provider (groq, together, deepinfra, …)
+```
+
+### How the Fetcher Works
+
+1. **Parallel fetch** — All 9 provider APIs fire simultaneously: Groq, Together, DeepInfra, Fireworks, Hyperbolic, Cerebras, SambaNova, Novita, OpenRouter
+2. **Merge strategy** — Direct provider fetches win over OpenRouter-derived entries (direct APIs have more accurate pricing). Entries are keyed by `(modelId, providerId)`.
+3. **Store** — Merged `ModelEntry[]` written to Supabase with a `CronRun` record
+
+### Environment Variables
+
+| Variable | Required | Notes |
+|---|---|---|
+| `SUPABASE_URL` | Yes | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service role key (server-side only) |
+| `CRON_SECRET` | Yes | Protects the cron endpoint |
+| `OPENROUTER_API_KEY` | No | Used by OpenRouter provider fetcher |
 | `NEXT_PUBLIC_HOME_URL` | Dev only | Falls back to `https://zlatkov.ai` |
