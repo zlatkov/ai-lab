@@ -308,7 +308,15 @@ export default function Page() {
                 className={`btn ${isActive ? 'active' : ''}`}
                 disabled={!canAfford && !isActive}
                 onClick={() => setBuildMode(isActive ? null : { kind: 'building', type: t })}
-                title={`${def.name} — ${def.description}\nProduces: ${formatRes(def.produces)}\nConsumes: ${formatRes(def.consumes) || '—'}`}
+                title={[
+                  `${def.name} — ${def.description}`,
+                  Object.keys(def.produces).length ? `Produces: ${formatRes(def.produces)}` : '',
+                  Object.keys(def.consumes).length
+                    ? `Needs: ${(Object.entries(def.consumes) as [keyof Resources, number][])
+                        .map(([k, v]) => `${v}/s ${RESOURCE_LABELS[k]}`)
+                        .join(', ')}`
+                    : '',
+                ].filter(Boolean).join('\n')}
                 style={{ minWidth: 88 }}
               >
                 <div className="text-base">{def.icon}</div>
@@ -346,27 +354,69 @@ export default function Page() {
       {/* Right side info panel */}
       {selected && selectedDef && (
         <div className="absolute top-24 right-2 panel p-3 w-80 fade-in" style={{ marginTop: 80 }}>
+          {/* Header */}
           <div className="flex items-start gap-3">
             <div className="text-3xl">{selectedDef.icon}</div>
             <div className="flex-1">
               <div className="font-semibold">{selectedDef.name}</div>
-              <div className="text-xs opacity-70">{selectedDef.description}</div>
+              <div className="text-xs opacity-70 leading-snug">{selectedDef.description}</div>
               <div className="text-xs mt-1">
-                <span className={selected.operational ? 'text-green-400' : 'text-zinc-400'}>
-                  {selected.operational ? '● Operational' : '○ Idle (missing inputs)'}
+                <span className={selected.operational ? 'text-green-400' : 'text-amber-400'}>
+                  {selected.operational ? '● Running' : '○ Idle'}
                 </span>
               </div>
             </div>
           </div>
-          <div className="mt-3 text-xs space-y-1">
-            <div>📍 ({selected.x}, {selected.y}) · {selectedDef.size}×{selectedDef.size}</div>
-            {Object.keys(selectedDef.produces).length > 0 && (
-              <div><b>Produces:</b> {formatRes(selectedDef.produces)}</div>
-            )}
-            {Object.keys(selectedDef.consumes).length > 0 && (
-              <div><b>Consumes:</b> {formatRes(selectedDef.consumes)}</div>
-            )}
-          </div>
+
+          {/* Produces */}
+          {Object.keys(selectedDef.produces).length > 0 && (
+            <div className="mt-3">
+              <div className="text-[10px] uppercase tracking-wide opacity-50 mb-1">Produces</div>
+              <div className="flex flex-wrap gap-1">
+                {(Object.entries(selectedDef.produces) as [keyof Resources, number][]).map(([k, v]) => (
+                  <span key={k} className="chip text-[11px] text-green-300">
+                    {RESOURCE_ICONS[k]} +{v}/s {RESOURCE_LABELS[k]}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Needs */}
+          {Object.keys(selectedDef.consumes).length > 0 && (
+            <div className="mt-3">
+              <div className="text-[10px] uppercase tracking-wide opacity-50 mb-1">Needs to run</div>
+              <div className="space-y-1.5">
+                {(Object.entries(selectedDef.consumes) as [keyof Resources, number][]).map(([k, v]) => {
+                  if (k === 'capital') return null;
+                  const have = ui.resources[k];
+                  const ok = have >= v;
+                  const suppliers = suppliersOf(k);
+                  return (
+                    <div key={k} className={`text-xs rounded px-2 py-1 ${ok ? 'bg-green-900/30' : 'bg-red-900/30'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className={ok ? 'text-green-300' : 'text-red-300'}>
+                          {ok ? '✓' : '✗'} {RESOURCE_ICONS[k]} {v}/s {RESOURCE_LABELS[k]}
+                        </span>
+                        <span className="opacity-50 text-[10px]">have {Math.floor(have)}</span>
+                      </div>
+                      {suppliers.length > 0 && (
+                        <div className="text-[10px] opacity-60 mt-0.5">
+                          from: {suppliers.map(t => BUILDING_DEFS[t].icon + ' ' + BUILDING_DEFS[t].name).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {selectedDef.consumes.capital !== undefined && (
+                  <div className="text-xs opacity-60">
+                    💰 {selectedDef.consumes.capital}/s upkeep cost
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {selected.type !== 'hq' && !selected.builtin && (
             <button
               className="btn mt-3 w-full"
@@ -536,4 +586,10 @@ function formatRes(r: Partial<Resources>): string {
   return Object.entries(r)
     .map(([k, v]) => `${RESOURCE_ICONS[k]}${v && v >= 0 ? '+' : ''}${v}/s`)
     .join(' ');
+}
+
+function suppliersOf(resource: keyof Resources): BuildingType[] {
+  return PLAYER_BUILDING_ORDER.filter(
+    t => (BUILDING_DEFS[t].produces[resource] ?? 0) > 0,
+  );
 }
