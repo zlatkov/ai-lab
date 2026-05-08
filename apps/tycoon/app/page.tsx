@@ -6,13 +6,15 @@ import type {
   UISnapshot, BuildingType, InfraType, PlacedBuilding, ChatMessage, Resources,
 } from '../lib/types';
 import {
-  BUILDING_DEFS, BUILDING_ORDER, INFRA_COST, INFRA_LABEL,
-  RESOURCE_ICONS, RESOURCE_LABELS, AI_DAILY_LIMIT, AI_RESEARCH_COST,
+  BUILDING_DEFS, PLAYER_BUILDING_ORDER, INFRA_COST, INFRA_LABEL,
+  RESOURCE_ICONS, RESOURCE_LABELS, AI_DAILY_LIMIT, AI_RESEARCH_COST, CHEAP_MODELS,
 } from '../lib/constants';
 import { listSaves, deleteSave, type SaveMeta } from '../lib/save';
 import {
   parseCommands, executeCommands, stripCommands, summarizeGameState,
 } from '../lib/ai-commands';
+
+const HOME_URL = process.env.NEXT_PUBLIC_HOME_URL ?? 'https://zlatkov.ai';
 
 const ZERO: Resources = { capital: 0, compute: 0, energy: 0, data: 0, talent: 0, research: 0 };
 
@@ -28,6 +30,9 @@ function fmtRate(n: number): string {
   if (Math.abs(n) >= 100) return `${sign}${n.toFixed(0)}/s`;
   return `${sign}${n.toFixed(1)}/s`;
 }
+
+const LS_CHAT_KEY = 'storage_tycoon_chat_key';
+const LS_CHAT_MODEL = 'tycoon_chat_model';
 
 export default function Page() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,6 +51,31 @@ export default function Page() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+
+  // BYOK settings
+  const [showChatSettings, setShowChatSettings] = useState(false);
+  const [useCustomKey, setUseCustomKey] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState('');
+  const [selectedModel, setSelectedModel] = useState(CHEAP_MODELS[0].id);
+  const [customModel, setCustomModel] = useState('');
+
+  // Persist BYOK prefs
+  useEffect(() => {
+    const saved = localStorage.getItem(LS_CHAT_KEY);
+    if (saved) { setUseCustomKey(true); setCustomApiKey(saved); }
+    const savedModel = localStorage.getItem(LS_CHAT_MODEL);
+    if (savedModel) setSelectedModel(savedModel);
+  }, []);
+
+  const saveChatSettings = () => {
+    if (useCustomKey && customApiKey) {
+      localStorage.setItem(LS_CHAT_KEY, customApiKey);
+    } else {
+      localStorage.removeItem(LS_CHAT_KEY);
+    }
+    localStorage.setItem(LS_CHAT_MODEL, selectedModel);
+    setShowChatSettings(false);
+  };
 
   // Init game
   useEffect(() => {
@@ -71,9 +101,7 @@ export default function Page() {
       setTimeout(() => setToast(null), 2500);
     };
 
-    // Try auto-load
     game.loadFrom('auto');
-
     game.start();
 
     return () => {
@@ -139,19 +167,24 @@ export default function Page() {
     setChatInput('');
     setChatLoading(true);
 
-    // Pay cost
     game.state.resources.research -= AI_RESEARCH_COST;
     game.state.aiQueriesUsedToday += 1;
     game.emitUI();
+
+    // Resolve model: customModel (free-text) > selectedModel dropdown
+    const resolvedModel = customModel.trim() || selectedModel;
+    const body: Record<string, unknown> = {
+      messages: newChat.map(m => ({ role: m.role, content: m.content })),
+      gameSummary: summarizeGameState(game),
+      model: resolvedModel,
+    };
+    if (useCustomKey && customApiKey) body.userApiKey = customApiKey;
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: newChat.map(m => ({ role: m.role, content: m.content })),
-          gameSummary: summarizeGameState(game),
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json() as { text?: string; error?: string };
       if (data.error || !data.text) {
@@ -180,8 +213,15 @@ export default function Page() {
     <div className="fixed inset-0 overflow-hidden">
       <canvas ref={canvasRef} />
 
-      {/* Top resource bar */}
+      {/* Top bar: home + resources */}
       <div className="absolute top-2 left-2 right-2 flex flex-wrap items-center gap-2 fade-in">
+        <a
+          href={HOME_URL}
+          className="chip no-underline opacity-80 hover:opacity-100 transition-opacity"
+          style={{ fontSize: 12 }}
+        >
+          ← Home
+        </a>
         <ResourceChip label="Capital" icon={RESOURCE_ICONS.capital} value={ui.resources.capital} rate={ui.rates.capital} prefix="$" big />
         <ResourceChip label="Energy" icon={RESOURCE_ICONS.energy} value={ui.resources.energy} rate={ui.rates.energy} />
         <ResourceChip label="Compute" icon={RESOURCE_ICONS.compute} value={ui.resources.compute} rate={ui.rates.compute} />
@@ -250,14 +290,14 @@ export default function Page() {
           <div className="mt-2 font-semibold">Goal</div>
           <div>Build the AI economy. Power → Compute → Data → Revenue.</div>
           <div className="mt-2 font-semibold">AI Advisor</div>
-          <div>Open the chat (bottom-left). Costs {AI_RESEARCH_COST} 🔬 per query, capped at {AI_DAILY_LIMIT}/day.</div>
+          <div>Open the chat (bottom-right). Costs {AI_RESEARCH_COST} 🔬 per query, capped at {AI_DAILY_LIMIT}/day.</div>
         </div>
       )}
 
       {/* Bottom build panel */}
       <div className="absolute bottom-2 left-2 right-96 panel p-2 fade-in">
         <div className="flex flex-wrap gap-1 mb-1">
-          {BUILDING_ORDER.filter(t => t !== 'hq').map(t => {
+          {PLAYER_BUILDING_ORDER.map(t => {
             const def = BUILDING_DEFS[t];
             const isActive = mode?.kind === 'building' && mode.type === t;
             const canAfford = ui.resources.capital >= def.cost;
@@ -326,7 +366,7 @@ export default function Page() {
               <div><b>Consumes:</b> {formatRes(selectedDef.consumes)}</div>
             )}
           </div>
-          {selected.type !== 'hq' && (
+          {selected.type !== 'hq' && !selected.builtin && (
             <button
               className="btn mt-3 w-full"
               style={{ background: 'rgba(127,29,29,0.7)' }}
@@ -344,16 +384,78 @@ export default function Page() {
       {/* AI chat (bottom-right) */}
       <div className="absolute bottom-2 right-2 fade-in" style={{ width: 380 }}>
         {chatOpen ? (
-          <div className="panel flex flex-col" style={{ height: 380 }}>
+          <div className="panel flex flex-col" style={{ height: showChatSettings ? 520 : 380 }}>
             <div className="flex items-center justify-between p-2 border-b border-white/10">
               <div className="text-sm font-semibold">🤖 AI Advisor</div>
               <div className="flex items-center gap-2 text-xs opacity-70">
                 <span>{ui.aiQueriesLeft}/{AI_DAILY_LIMIT} left</span>
                 <span>·</span>
                 <span>{AI_RESEARCH_COST}🔬/query</span>
+                <button
+                  className={`btn px-2 py-0.5 ${showChatSettings ? 'active' : ''}`}
+                  title="AI settings"
+                  onClick={() => setShowChatSettings(v => !v)}
+                >⚙</button>
                 <button className="btn px-2 py-0.5" onClick={() => setChatOpen(false)}>×</button>
               </div>
             </div>
+
+            {/* Settings drawer */}
+            {showChatSettings && (
+              <div className="p-3 border-b border-white/10 text-xs space-y-2">
+                <div className="font-semibold text-sm mb-1">AI Settings</div>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useCustomKey}
+                    onChange={e => setUseCustomKey(e.target.checked)}
+                  />
+                  Use my own OpenRouter API key (BYOK)
+                </label>
+
+                {useCustomKey && (
+                  <input
+                    type="password"
+                    value={customApiKey}
+                    onChange={e => setCustomApiKey(e.target.value)}
+                    placeholder="sk-or-..."
+                    className="w-full bg-zinc-900 border border-white/10 rounded px-2 py-1 outline-none focus:border-blue-500 font-mono"
+                  />
+                )}
+
+                <div>
+                  <div className="opacity-70 mb-1">Model preset</div>
+                  <select
+                    value={selectedModel}
+                    onChange={e => setSelectedModel(e.target.value)}
+                    className="w-full bg-zinc-900 border border-white/10 rounded px-2 py-1 outline-none"
+                  >
+                    {CHEAP_MODELS.map(m => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="opacity-70 mb-1">Custom model ID (overrides preset)</div>
+                  <input
+                    type="text"
+                    value={customModel}
+                    onChange={e => setCustomModel(e.target.value)}
+                    placeholder="e.g. anthropic/claude-3-5-haiku"
+                    className="w-full bg-zinc-900 border border-white/10 rounded px-2 py-1 outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+
+                {!useCustomKey && (
+                  <div className="opacity-60 italic">Using server-side OpenRouter key (default).</div>
+                )}
+
+                <button className="btn w-full" onClick={saveChatSettings}>Save settings</button>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto p-2 scrollbar-thin space-y-2 text-xs">
               {chat.length === 0 && (
                 <div className="opacity-60 italic">

@@ -13,7 +13,9 @@ export const ZERO_RES: Resources = { capital: 0, compute: 0, energy: 0, data: 0,
 
 export type BuildingType =
   | 'hq' | 'power_plant' | 'office' | 'data_center'
-  | 'research_lab' | 'gpu_farm' | 'server_farm' | 'ai_lab';
+  | 'research_lab' | 'gpu_farm' | 'server_farm' | 'ai_lab'
+  | 'station'
+  | 'city_house' | 'town_hall' | 'city_market' | 'city_station' | 'city_park';
 
 export type InfraType = 'road' | 'railway' | 'power_line';
 
@@ -28,6 +30,7 @@ export interface PlacedBuilding {
   x: number;
   y: number;
   operational: boolean;
+  builtin?: boolean;
 }
 
 export interface AiCommand {

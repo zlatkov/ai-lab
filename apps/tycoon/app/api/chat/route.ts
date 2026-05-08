@@ -5,6 +5,8 @@ import { BUILDING_DEFS, GRID_W, GRID_H } from '../../../lib/constants';
 interface ChatBody {
   messages: { role: 'user' | 'assistant'; content: string }[];
   gameSummary: string;
+  userApiKey?: string;
+  model?: string;
 }
 
 const buildingsList = Object.values(BUILDING_DEFS)
@@ -39,8 +41,8 @@ Be terse — 1-3 sentences of advice, then commands if any. No markdown headers,
 export async function POST(req: Request) {
   try {
     const body = await req.json() as ChatBody;
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) return Response.json({ error: 'OPENROUTER_API_KEY not configured' }, { status: 500 });
+    const apiKey = body.userApiKey ?? process.env.OPENROUTER_API_KEY;
+    if (!apiKey) return Response.json({ error: 'No API key configured. Add your OpenRouter API key in the AI settings.' }, { status: 500 });
 
     const openrouter = createOpenAI({
       baseURL: 'https://openrouter.ai/api/v1',
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
         'X-Title': 'tycoon',
       },
     });
-    const model = process.env.TYCOON_MODEL ?? 'meta-llama/llama-3.1-8b-instruct';
+    const model = body.model ?? process.env.TYCOON_MODEL ?? 'meta-llama/llama-3.1-8b-instruct';
 
     const messages: { role: 'user' | 'assistant'; content: string }[] = [
       { role: 'user', content: `Game state:\n${body.gameSummary}` },
