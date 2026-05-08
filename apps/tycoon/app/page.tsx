@@ -7,7 +7,7 @@ import type {
 } from '../lib/types';
 import {
   BUILDING_DEFS, PLAYER_BUILDING_ORDER, INFRA_COST, INFRA_LABEL,
-  RESOURCE_ICONS, RESOURCE_LABELS, AI_DAILY_LIMIT, AI_RESEARCH_COST, CHEAP_MODELS,
+  RESOURCE_ICONS, RESOURCE_LABELS, AI_DAILY_LIMIT, AI_RESEARCH_COST, CHEAP_MODELS, MAX_RESOURCES,
 } from '../lib/constants';
 import { listSaves, deleteSave, type SaveMeta } from '../lib/save';
 import {
@@ -223,11 +223,11 @@ export default function Page() {
           ← Home
         </a>
         <ResourceChip label="Capital" icon={RESOURCE_ICONS.capital} value={ui.resources.capital} rate={ui.rates.capital} prefix="$" big />
-        <ResourceChip label="Energy" icon={RESOURCE_ICONS.energy} value={ui.resources.energy} rate={ui.rates.energy} />
-        <ResourceChip label="Compute" icon={RESOURCE_ICONS.compute} value={ui.resources.compute} rate={ui.rates.compute} />
-        <ResourceChip label="Data" icon={RESOURCE_ICONS.data} value={ui.resources.data} rate={ui.rates.data} />
-        <ResourceChip label="Talent" icon={RESOURCE_ICONS.talent} value={ui.resources.talent} rate={ui.rates.talent} />
-        <ResourceChip label="Research" icon={RESOURCE_ICONS.research} value={ui.resources.research} rate={ui.rates.research} />
+        <ResourceChip label="Energy" icon={RESOURCE_ICONS.energy} value={ui.resources.energy} rate={ui.rates.energy} max={MAX_RESOURCES.energy} />
+        <ResourceChip label="Compute" icon={RESOURCE_ICONS.compute} value={ui.resources.compute} rate={ui.rates.compute} max={MAX_RESOURCES.compute} />
+        <ResourceChip label="Data" icon={RESOURCE_ICONS.data} value={ui.resources.data} rate={ui.rates.data} max={MAX_RESOURCES.data} />
+        <ResourceChip label="Talent" icon={RESOURCE_ICONS.talent} value={ui.resources.talent} rate={ui.rates.talent} max={MAX_RESOURCES.talent} />
+        <ResourceChip label="Research" icon={RESOURCE_ICONS.research} value={ui.resources.research} rate={ui.rates.research} max={MAX_RESOURCES.research} />
         <div className="flex-1" />
         <span className="chip">Day {ui.day}</span>
       </div>
@@ -514,15 +514,20 @@ export default function Page() {
   );
 }
 
-function ResourceChip({ label, icon, value, rate, prefix = '', big = false }: {
-  label: string; icon: string; value: number; rate: number; prefix?: string; big?: boolean;
+function ResourceChip({ label, icon, value, rate, prefix = '', big = false, max }: {
+  label: string; icon: string; value: number; rate: number; prefix?: string; big?: boolean; max?: number;
 }) {
   const rateColor = rate > 0 ? 'text-green-400' : rate < 0 ? 'text-red-400' : 'opacity-60';
+  const atCap = max !== undefined && value >= max;
   return (
-    <div className="chip" title={label} style={big ? { fontSize: 14 } : undefined}>
+    <div className="chip" title={`${label}${max ? ` (max ${max})` : ''}`} style={big ? { fontSize: 14 } : undefined}>
       <span>{icon}</span>
-      <span className="font-semibold">{prefix}{fmt(value)}</span>
-      <span className={`text-[11px] ${rateColor}`}>{fmtRate(rate)}</span>
+      <span className={`font-semibold ${atCap ? 'text-yellow-300' : ''}`}>
+        {prefix}{fmt(value)}{max ? <span className="opacity-50">/{fmt(max)}</span> : null}
+      </span>
+      <span className={`text-[11px] ${atCap ? 'opacity-40' : rateColor}`}>
+        {atCap ? 'FULL' : fmtRate(rate)}
+      </span>
     </div>
   );
 }

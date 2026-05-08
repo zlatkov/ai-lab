@@ -1,6 +1,6 @@
 import type { GameState, PlacedBuilding, Resources } from './types';
 import { ZERO_RES } from './types';
-import { BUILDING_DEFS, GRID_W, GRID_H, TICKS_PER_DAY, STATION_TALENT_BONUS } from './constants';
+import { BUILDING_DEFS, GRID_W, GRID_H, TICKS_PER_DAY, STATION_TALENT_BONUS, MAX_RESOURCES } from './constants';
 
 function efficiency(state: GameState, b: PlacedBuilding): number {
   const def = BUILDING_DEFS[b.type];
@@ -106,6 +106,12 @@ export function tick(state: GameState): void {
     }
   }
   state.rates = rates;
+
+  // Clamp to storage caps; floor non-capital resources at 0
+  for (const [k, max] of Object.entries(MAX_RESOURCES) as Array<[keyof typeof MAX_RESOURCES, number]>) {
+    if (state.resources[k] > max) state.resources[k] = max;
+    if (state.resources[k] < 0) state.resources[k] = 0;
+  }
 
   state.tick++;
   if (state.tick % TICKS_PER_DAY === 0) state.day++;

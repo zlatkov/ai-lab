@@ -122,6 +122,15 @@ export const PLAYER_BUILDING_ORDER: BuildingType[] = [
   'gpu_farm', 'server_farm', 'ai_lab',
 ];
 
+// Storage caps per resource (capital is uncapped — it's money)
+export const MAX_RESOURCES = {
+  energy:   500,
+  compute:  500,
+  data:     1000,
+  talent:   300,
+  research: 150,
+} as const;
+
 export const INFRA_COST: Record<string, number> = {
   road: 10,
   railway: 30,
