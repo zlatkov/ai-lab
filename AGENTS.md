@@ -10,7 +10,7 @@ apps/
 ├── skillab/    Skill evaluator + dependency graph (skillab.zlatkov.ai)
 ├── ai-news/    AI news digest agent (ainews.zlatkov.ai)
 ├── oss-llms/   OSS LLM pricing tracker (llms.zlatkov.ai)
-└── tycoon/     AI economy tycoon game (tycoon.zlatkov.ai)
+└── ai-tycoon/  AI economy tycoon game (tycoon.zlatkov.ai)
 ```
 
 Each app has its own `package.json`, `next.config.ts`, `tsconfig.json`, and `vercel.json` where applicable. They share no code packages — each `lib/` is app-local.
@@ -185,12 +185,12 @@ apps/oss-llms/
 
 ---
 
-## apps/tycoon
+## apps/ai-tycoon
 
 Browser-based city-builder tycoon game where the player builds an AI industry. HTML5 Canvas game engine running inside a Next.js shell. All game logic is client-side; the only server route is the AI advisor chat proxy.
 
 ```
-apps/tycoon/
+apps/ai-tycoon/
 ├── app/
 │   ├── page.tsx              # React UI shell — resource bar, build panel, info panel, AI chat
 │   ├── layout.tsx

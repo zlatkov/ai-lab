@@ -28,7 +28,7 @@ apps/
 ├── skillab/    → skillab.zlatkov.ai    Skill evaluator + dependency graph
 ├── ai-news/    → ainews.zlatkov.ai     AI news digest
 ├── oss-llms/   → llms.zlatkov.ai       OSS LLM pricing tracker
-└── tycoon/     → tycoon.zlatkov.ai     AI economy tycoon game
+└── ai-tycoon/  → tycoon.zlatkov.ai     AI economy tycoon game
 ```
 
 Built with [Turborepo](https://turbo.build). Each app is deployed independently on Vercel.
@@ -42,7 +42,7 @@ npm run dev:home      # http://localhost:3000
 npm run dev:skillab   # http://localhost:3001
 npm run dev:ainews    # http://localhost:3002
 npm run dev:ossllms   # http://localhost:3003
-npm run dev:tycoon    # http://localhost:3004
+npm run dev:ai-tycoon # http://localhost:3004
 
 npm run dev           # all apps via turbo
 ```
